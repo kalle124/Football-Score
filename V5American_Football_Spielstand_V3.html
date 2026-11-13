@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Football">
+<meta name="theme-color" content="#0b0f14">
+<title>American Football – Spielstand V3</title>
+<style>
+  :root {
+    --bg: #0b0f14;
+    --panel: #151b23;
+    --line: #26303c;
+    --text: #e8edf3;
+    --muted: #7d8a99;
+    --a: #22c55e;
+    --a-bg: rgba(34, 197, 94, 0.14);
+    --b: #ef4444;
+    --b-bg: rgba(239, 68, 68, 0.14);
+    --neutral: #3a4654;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    overflow: hidden;
+    user-select: none;
+  }
+  body {
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  .app {
+    height: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1.9fr 1fr;
+    gap: 8px;
+    padding: 8px;
+  }
+  .col { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 8px;
+  }
+  .label { font-size: 11px; letter-spacing: 1px; color: var(--muted); text-transform: uppercase; }
+  .tc-a { color: var(--a) !important; }
+  .tc-b { color: var(--b) !important; }
+
+  /* Offensive-Farbe */
+  .offense.off-a { background: var(--a-bg); border-color: var(--a); }
+  .offense.off-b { background: var(--b-bg); border-color: var(--b); }
+
+  /* Links: Touchdown / Field Goal */
+  .scoring { flex: 1; display: flex; flex-direction: column; gap: 8px; justify-content: center; }
+  .btn {
+    border: none; border-radius: 10px; color: #fff; font-weight: 700;
+    font-size: 15px; padding: 10px 6px; cursor: pointer; width: 100%;
+    transition: transform 0.05s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .off-a .btn-off { background: var(--a); color: #04210f; }
+  .off-b .btn-off { background: var(--b); color: #2a0606; }
+  .btn-off-row {
+    display: flex; align-items: center; justify-content: flex-start; gap: 10px;
+    padding: 14px 12px; font-size: 14px;
+  }
+  .btn-off-row .pts { font-size: 34px; font-weight: 800; line-height: 1; min-width: 56px; text-align: left; }
+  .btn-off-row .what { font-size: 14px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
+
+  /* Mitte: Punktestand + Leiste */
+  .center { flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  .scores { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; min-height: 0; }
+  .team-box {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 6px;
+  }
+  .team-name {
+    font-size: 14px; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase; cursor: pointer; padding: 2px 6px;
+  }
+  .team-box .num { font-size: 92px; font-weight: 800; line-height: 1; }
+  .team-a .team-name, .team-a .num { color: var(--a); }
+  .team-b .team-name, .team-b .num { color: var(--b); }
+
+  .bottom-bar {
+    display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; text-align: center;
+    padding: 8px 6px;
+  }
+  .bottom-bar .val { font-size: 22px; font-weight: 800; }
+
+  /* Rechts: Downs und Spiel beenden */
+  .down-card { display: flex; flex-direction: column; gap: 6px; }
+  .down-top { display: flex; align-items: center; gap: 8px; }
+  .down-num { font-size: 40px; font-weight: 800; line-height: 1; min-width: 56px; text-align: center; }
+  .down-actions { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  .off-a .btn-next { background: var(--a); color: #04210f; }
+  .off-b .btn-next { background: var(--b); color: #2a0606; }
+  .btn-neutral { background: var(--neutral); color: var(--text); }
+  .btn-danger { background: #b91c1c; color: #fee2e2; }
+  .btn-ghost { background: transparent; border: 1px solid var(--line); color: var(--text); }
+  .end-wrap { flex: 1; display: flex; }
+  .end-wrap .btn-danger { font-size: 18px; }
+
+  /* Modal */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7);
+    display: none; align-items: center; justify-content: center; padding: 16px; z-index: 10;
+  }
+  .overlay.show { display: flex; }
+  .modal {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    width: min(420px, 100%); padding: 16px; position: relative;
+  }
+  .modal h2 { font-size: 18px; margin-bottom: 8px; padding-right: 28px; }
+  .modal p { font-size: 14px; color: var(--muted); line-height: 1.4; margin-bottom: 12px; white-space: pre-line; }
+  .modal .btns { display: flex; gap: 8px; }
+  .modal .btns .btn { flex: 1; }
+  .close-x {
+    position: absolute; top: 8px; right: 8px; background: none; border: none;
+    color: var(--muted); font-size: 22px; cursor: pointer; width: 32px; height: 32px;
+  }
+  .btn-a { background: var(--a); color: #04210f; }
+  .btn-b { background: var(--b); color: #2a0606; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- LINKS: Touchdown / Field Goal -->
+  <div class="col">
+    <div class="card offense scoring-card" id="scoringBox" style="flex:1;display:flex;flex-direction:column;">
+      <div class="scoring">
+        <button class="btn btn-off btn-off-row" id="btnTD">
+          <span class="pts">+6</span><span class="what">Touchdown</span>
+        </button>
+        <button class="btn btn-off btn-off-row" id="btnFG">
+          <span class="pts">+3</span><span class="what">Field Goal</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MITTE: Punktestand + Leiste -->
+  <div class="center">
+    <div class="scores">
+      <div class="card team-box team-a">
+        <div class="team-name" data-team="a">Team A</div>
+        <div class="num" id="scoreA">0</div>
+      </div>
+      <div class="card team-box team-b">
+        <div class="team-name" data-team="b">Team B</div>
+        <div class="num" id="scoreB">0</div>
+      </div>
+    </div>
+
+    <div class="card bottom-bar">
+      <div><div class="label">Halbzeit</div><div class="val" id="half">1/2</div></div>
+      <div><div class="label">Phase</div><div class="val" id="phase">1/4</div></div>
+      <div><div class="label tc-a" id="labelA">Team A</div><div class="val tc-a" id="phasesA">0</div></div>
+      <div><div class="label tc-b" id="labelB">Team B</div><div class="val tc-b" id="phasesB">0</div></div>
+    </div>
+  </div>
+
+  <!-- RECHTS: Downs + Spiel beenden -->
+  <div class="col">
+    <div class="card offense down-card" id="downBox">
+      <div class="down-top">
+        <div class="down-num" id="downNum">1.</div>
+        <div class="down-actions">
+          <button class="btn btn-next" id="btnNext">Nächster Versuch</button>
+          <button class="btn btn-neutral" id="btnTurnover">Turnover / INT</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="end-wrap">
+      <button class="btn btn-danger" id="btnEnd">Spiel beenden</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal -->
+<div class="overlay" id="overlay">
+  <div class="modal" id="modal">
+    <button class="close-x" id="modalX" aria-label="Schließen">×</button>
+    <h2 id="modalTitle"></h2>
+    <p id="modalText"></p>
+    <div class="btns" id="modalBtns"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const KEY = 'afb_spielstand_v3';
+  const DEFAULT = {
+    score: { a: 0, b: 0 },
+    names: { a: 'Team A', b: 'Team B' },
+    offense: 'a',
+    down: 1,
+    phases: { a: 0, b: 0 },
+    half: 1,
+    halfPhases: 0,
+    started: false
+  };
+
+  let S = load();
+  let pendingExtra = false;
+  let modalCloseFn = null;
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw) return Object.assign(structuredClone(DEFAULT), JSON.parse(raw));
+    } catch (e) {}
+    return structuredClone(DEFAULT);
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {}
+  }
+  const other = t => (t === 'a' ? 'b' : 'a');
+  const $ = id => document.getElementById(id);
+
+  function render() {
+    const off = S.offense;
+
+    $('scoreA').textContent = S.score.a;
+    $('scoreB').textContent = S.score.b;
+    $('labelA').textContent = S.names.a;
+    $('labelB').textContent = S.names.b;
+    $('half').textContent = S.half + '/2';
+    $('phase').textContent = Math.min(S.halfPhases + 1, 4) + '/4';
+    $('phasesA').textContent = S.phases.a;
+    $('phasesB').textContent = S.phases.b;
+
+    ['scoringBox', 'downBox'].forEach(id => {
+      const el = $(id);
+      el.classList.toggle('off-a', off === 'a');
+      el.classList.toggle('off-b', off === 'b');
+    });
+
+    $('downNum').textContent = S.down + '.';
+
+    document.querySelectorAll('.team-name').forEach(el => {
+      el.textContent = S.names[el.dataset.team];
+    });
+  }
+
+  function openModal(title, text, buttons, onClose) {
+    $('modalTitle').textContent = title;
+    $('modalText').textContent = text;
+    const wrap = $('modalBtns');
+    wrap.innerHTML = '';
+    buttons.forEach(b => {
+      const btn = document.createElement('button');
+      btn.className = 'btn ' + (b.cls || 'btn-neutral');
+      btn.textContent = b.label;
+      btn.onclick = () => {
+        modalCloseFn = null;
+        $('overlay').classList.remove('show');
+        b.fn && b.fn();
+      };
+      wrap.appendChild(btn);
+    });
+    modalCloseFn = onClose || null;
+    $('overlay').classList.add('show');
+  }
+  function closeModal() {
+    $('overlay').classList.remove('show');
+    const fn = modalCloseFn;
+    modalCloseFn = null;
+    if (fn) fn();
+  }
+  $('modalX').onclick = () => closeModal();
+
+  function endDrive() {
+    const team = S.offense;
+    S.phases[team] += 1;
+    S.halfPhases += 1;
+    S.offense = other(team);
+    S.down = 1;
+    save();
+    render();
+    checkHalftime();
+  }
+
+  function checkHalftime() {
+    if (S.halfPhases < 4) return;
+    if (S.half === 1) {
+      openModal('Halbzeit – neuer Kickoff',
+        'Die zweite Halbzeit beginnt.',
+        [{ label: 'Weiter', cls: 'btn-a', fn: startSecondHalf }],
+        startSecondHalf);
+    } else {
+      openModal('Spielende',
+        'Alle Offensivphasen der zweiten Halbzeit sind abgeschlossen. Bitte „Spiel beenden“ drücken.',
+        [{ label: 'OK', cls: 'btn-neutral' }]);
+    }
+  }
+
+  function startSecondHalf() {
+    S.half = 2;
+    S.halfPhases = 0;
+    save();
+    render();
+  }
+
+  $('btnTD').onclick = () => {
+    if (!S.started) return;
+    const team = S.offense;
+    S.score[team] += 6;
+    save();
+    render();
+    pendingExtra = true;
+    openModal('Extrapunkt?',
+      S.names[team] + ' hat einen Touchdown erzielt. Extrapunkt erfolgreich?',
+      [
+        { label: 'Ja (+1)', cls: 'btn-a', fn: () => extraAnswer(true) },
+        { label: 'Nein', cls: 'btn-neutral', fn: () => extraAnswer(false) }
+      ],
+      () => extraAnswer(false));
+  };
+
+  function extraAnswer(yes) {
+    if (!pendingExtra) return;
+    pendingExtra = false;
+    if (yes) S.score[S.offense] += 1;
+    endDrive();
+  }
+
+  $('btnFG').onclick = () => {
+    if (!S.started) return;
+    S.score[S.offense] += 3;
+    endDrive();
+  };
+
+  $('btnNext').onclick = () => {
+    if (!S.started) return;
+    if (S.down < 10) {
+      S.down += 1;
+      save();
+      render();
+    } else {
+      const team = S.offense;
+      openModal('Turnover on Downs',
+        S.names[team] + ' hat den Ball nach dem 10. Versuch verloren.',
+        [{ label: 'OK', cls: 'btn-neutral', fn: endDrive }],
+        endDrive);
+    }
+  };
+
+  $('btnTurnover').onclick = () => {
+    if (!S.started) return;
+    endDrive();
+  };
+
+  document.querySelectorAll('.team-name').forEach(el => {
+    el.onclick = () => {
+      const t = el.dataset.team;
+      const name = prompt('Neuer Teamname:', S.names[t]);
+      if (name && name.trim()) {
+        S.names[t] = name.trim().slice(0, 16);
+        save();
+        render();
+      }
+    };
+  });
+
+  // Spiel beenden: Endstand + Neues Spiel (Reset)
+  $('btnEnd').onclick = () => {
+    const a = S.score.a, b = S.score.b;
+    let result;
+    if (a > b) result = S.names.a + ' gewinnt';
+    else if (b > a) result = S.names.b + ' gewinnt';
+    else result = 'Unentschieden';
+    openModal('Endstand',
+      S.names.a + ' ' + a + ' : ' + b + ' ' + S.names.b + '\n' + result,
+      [
+        { label: 'Schließen', cls: 'btn-neutral' },
+        { label: 'Neues Spiel', cls: 'btn-danger', fn: resetGame }
+      ]);
+  };
+
+  function resetGame() {
+    S = structuredClone(DEFAULT);
+    save();
+    render();
+    showStart();
+  }
+
+  function showStart() {
+    openModal('Wer greift zuerst an?', 'Wähle das Team für die erste Offensive.',
+      [
+        { label: S.names.a, cls: 'btn-a', fn: () => startGame('a') },
+        { label: S.names.b, cls: 'btn-b', fn: () => startGame('b') }
+      ], () => startGame('a'));
+  }
+  function startGame(team) {
+    S.started = true;
+    S.offense = team;
+    save();
+    render();
+  }
+
+  render();
+  if (!S.started) showStart();
+  else checkHalftime();
+})();
+</script>
+</body>
+</html>
